@@ -1,0 +1,33 @@
+$DeploymentPath     = "D:\SnapAudit\API\API"
+$EnvironmentPath    = "D:\SnapAudit\API\API\SEOToolAPI"     # existing venv folder
+$CurrentBuildBackup = "D:\Backup\ReleaseBuildBackup\SnapAudit\SnapAuditAPI"
+$SourcePath         = "%teamcity.build.checkoutDir%"        # TeamCity checkout dir
+$ExcludeNames       = @("SEOToolAPI", ".vs", ".vscode", "web.config", ".gitignore", ".env")
+
+# Step 1: Backup Current Build
+$stamp = "SnapAudit_API_" + (Get-Date -Format "yyyyMMddHHmmss")
+$backupPath = Join-Path $CurrentBuildBackup $stamp
+Write-Host "Step 1: Backing up current build to $backupPath..."
+Copy-Item -Path $DeploymentPath -Destination $backupPath -Recurse -Force
+
+# Step 2: Remove Old Deployment (excluding some top-level files/folders)
+Write-Host "Step 2: Cleaning old deployment (excluding env & configs)..."
+Get-ChildItem -Path $DeploymentPath | 
+    Where-Object { $ExcludeNames -notcontains $_.Name } | 
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+# Step 3: Copy New Build (excluding some top-level files/folders)
+Write-Host "Step 3: Copying new build from $SourcePath (excluding env & configs)..."
+Get-ChildItem -Path $SourcePath | 
+    Where-Object { $ExcludeNames -notcontains $_.Name } | 
+    Copy-Item -Destination $DeploymentPath -Recurse -Force
+
+# Step 4: Activate Virtual Environment
+Write-Host "Step 4: Activating Python virtual environment..."
+& "$EnvironmentPath\Scripts\activate.ps1"
+
+# Step 5: Install Libraries
+Write-Host "Step 5: Installing required libraries from requirements.txt..."
+pip install -r "$DeploymentPath\project_details\requirements.txt"
+
+Write-Host "Deployment completed successfully!"
